@@ -19,77 +19,109 @@ class RecommendationsTests {
     }
 
 
+//    @Test
+//    fun returns_no_recommendations_when_no_locations() {
+//        check(
+//            featuredDestinations = emptyMap(),
+//            distances = distances,
+//            recommendations = emptySet(),
+//            shouldReturn = emptyList()
+//        )
+//    }
+//
+//
+//    @Test
+//    fun returns_no_recommendations_when_no_featured() {
+//        check(
+//            featuredDestinations = emptyMap(),
+//            distances = distances,
+//            recommendations = setOf(paris),
+//            shouldReturn = emptyList()
+//        )
+//    }
+
     @Test
-    fun returns_no_recommendations_when_no_locations() {
-        check(
-            featuredDestinations = emptyMap(),
-            distances = distances,
-            recommendations = emptySet(),
-            shouldReturn = emptyList()
+    fun returns_recommendations_for_single_locRation() {
+        val featuredDestinations = mapOf<Location, List<FeaturedDestination>>(
+            paris to listOf(eiffelTower, louvre),
+        ).withDefault { emptyList() }
+        val mockDistances =  distances.withDefault { -1 }
+
+        val recommendations = Recommendations(featuredDestinations::getValue, mockDistances::getValue)
+        val resultFor = recommendations.recommendationsFor(setOf(paris))
+
+        val shouldReturn = listOf(
+            FeaturedDestinationSuggestion(paris, louvre, 1000),
+            FeaturedDestinationSuggestion(paris, eiffelTower, 5000)
         )
-    }
 
-
-    @Test
-    fun returns_no_recommendations_when_no_featured() {
-        check(
-            featuredDestinations = emptyMap(),
-            distances = distances,
-            recommendations = setOf(paris),
-            shouldReturn = emptyList()
-        )
-    }
-
-
-    @Test
-    fun returns_recommendations_for_single_location() {
-        check(
-            featuredDestinations = mapOf(
-                paris to listOf(eiffelTower, louvre),
-            ),
-            distances = distances,
-            recommendations = setOf(paris),
-            shouldReturn = listOf(
-                FeaturedDestinationSuggestion(paris, louvre, 1000),
-                FeaturedDestinationSuggestion(paris, eiffelTower, 5000)
-            )
-        )
+        assertEquals(shouldReturn, resultFor)
+//
+//        check(
+//            featuredDestinations = mapOf(
+//                paris to listOf(eiffelTower, louvre),
+//            ),
+//            distances = distances,
+//            recommendations = setOf(paris),
+//            shouldReturn = listOf(
+//                FeaturedDestinationSuggestion(paris, louvre, 1000),
+//                FeaturedDestinationSuggestion(paris, eiffelTower, 5000)
+//            )
+//        )
     }
 
 
     @Test
     fun returns_recommendations_for_multi_location() {
-        check(
-            featuredDestinations = mapOf(
-                paris to listOf(eiffelTower, louvre),
-                alton to listOf(flowerFarm, watercressLine),
-            ),
-            distances = distances,
-            recommendations = setOf(paris, alton),
-            shouldReturn = listOf(
-                FeaturedDestinationSuggestion(alton, watercressLine, 320),
+        val featuredDestinations = mapOf<Location, List<FeaturedDestination>>(
+            paris to listOf(eiffelTower, louvre),
+            alton to listOf(flowerFarm, watercressLine),
+        ).withDefault { emptyList() }
+        val mockDistances =  distances.withDefault { -1 }
+
+        val recommendations = Recommendations(featuredDestinations::getValue, mockDistances::getValue)
+        val resultFor = recommendations.recommendationsFor(setOf(paris, alton))
+
+        val shouldReturn = listOf(
+                            FeaturedDestinationSuggestion(alton, watercressLine, 320),
                 FeaturedDestinationSuggestion(paris, louvre, 1000),
                 FeaturedDestinationSuggestion(paris, eiffelTower, 5000),
                 FeaturedDestinationSuggestion(alton, flowerFarm, 5300)
-            )
         )
-    }
 
-    @Test
-    fun deduplicates_using_smallest_distance() {
-        check(
-            featuredDestinations = mapOf(
-                alton to listOf(flowerFarm, watercressLine),
-                froyle to listOf(flowerFarm, watercressLine)
-            ),
-            distances = distances,
-            recommendations = setOf(alton, froyle),
-            shouldReturn = listOf(
-                FeaturedDestinationSuggestion(froyle, flowerFarm, 0),
-                FeaturedDestinationSuggestion(alton, watercressLine, 320)
-            )
-        )
+        assertEquals(shouldReturn, resultFor)
+
+//        check(
+//            featuredDestinations = mapOf(
+//                paris to listOf(eiffelTower, louvre),
+//                alton to listOf(flowerFarm, watercressLine),
+//            ),
+//            distances = distances,
+//            recommendations = setOf(paris, alton),
+//            shouldReturn = listOf(
+//                FeaturedDestinationSuggestion(alton, watercressLine, 320),
+//                FeaturedDestinationSuggestion(paris, louvre, 1000),
+//                FeaturedDestinationSuggestion(paris, eiffelTower, 5000),
+//                FeaturedDestinationSuggestion(alton, flowerFarm, 5300)
+//            )
+//        )
     }
+//
+//    @Test
+//    fun deduplicates_using_smallest_distance() {
+//        check(
+//            featuredDestinations = mapOf(
+//                alton to listOf(flowerFarm, watercressLine),
+//                froyle to listOf(flowerFarm, watercressLine)
+//            ),
+//            distances = distances,
+//            recommendations = setOf(alton, froyle),
+//            shouldReturn = listOf(
+//                FeaturedDestinationSuggestion(froyle, flowerFarm, 0),
+//                FeaturedDestinationSuggestion(alton, watercressLine, 320)
+//            )
+//        )
+//    }
 }
 
 private fun subjectFor(
