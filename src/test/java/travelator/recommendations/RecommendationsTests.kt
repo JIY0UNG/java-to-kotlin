@@ -1,12 +1,51 @@
 package travelator.recommendations
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import travelator.Id
 import travelator.destinations.FeaturedDestination
 import travelator.domain.Location
+import kotlin.reflect.KProperty
+
+class Given<T>(private var getter: () -> T) {
+    operator fun getValue(thisRef: Any?, property: KProperty<*>): T {
+        return getter()
+    }
+
+    operator fun setValue(
+        thisRef: Any?,
+        property: KProperty<*>,
+        value: T
+    ) {
+        this.getter = { value }
+    }
+}
 
 class RecommendationsTests {
+    var featuredDestinations by Given {
+        listOf(
+            paris to listOf(eiffelTower, louvre),
+        )
+    }
+
+    var destinationFinder by Given {
+        featuredDestinations.toMap().withDefault { emptyList() }
+    }
+
+    var featuredDistances by Given {
+        distances.withDefault { -1 }
+    }
+
+    var journeys by Given {
+        listOf(paris)
+    }
+
+    var journey by Given {
+        journeys.toSet()
+    }
+
     companion object {
         val distances = mapOf(
             (paris to eiffelTower.location) to 5000,
@@ -18,140 +57,114 @@ class RecommendationsTests {
         )
     }
 
+    @Nested
+    inner class Describe_Recommendation {
+        @Nested
+        inner class When_no_locations {
+            @BeforeEach
+            fun setUp() {
+                featuredDestinations = emptyList()
+                journeys = emptyList()
+            }
 
-//    @Test
-//    fun returns_no_recommendations_when_no_locations() {
-//        check(
-//            featuredDestinations = emptyMap(),
-//            distances = distances,
-//            recommendations = emptySet(),
-//            shouldReturn = emptyList()
-//        )
-//    }
-//
-//
-//    @Test
-//    fun returns_no_recommendations_when_no_featured() {
-//        check(
-//            featuredDestinations = emptyMap(),
-//            distances = distances,
-//            recommendations = setOf(paris),
-//            shouldReturn = emptyList()
-//        )
-//    }
+            @Test
+            fun returns_no_recommendations() {
+                val recommendations = Recommendations(destinationFinder::getValue, featuredDistances::getValue)
+                val suggestions = recommendations.recommendationsFor(journey)
 
-    @Test
-    fun returns_recommendations_for_single_locRation() {
-        val featuredDestinations = mapOf<Location, List<FeaturedDestination>>(
-            paris to listOf(eiffelTower, louvre),
-        ).withDefault { emptyList() }
-        val mockDistances =  distances.withDefault { -1 }
+                assertEquals(suggestions, emptyList<FeaturedDestinationSuggestion>())
+            }
+        }
 
-        val recommendations = Recommendations(featuredDestinations::getValue, mockDistances::getValue)
-        val resultFor = recommendations.recommendationsFor(setOf(paris))
+        @Nested
+        inner class When_no_featured {
+            @BeforeEach
+            fun setUp() {
+                featuredDestinations = emptyList()
+                journeys = listOf(paris)
+            }
 
-        val shouldReturn = listOf(
-            FeaturedDestinationSuggestion(paris, louvre, 1000),
-            FeaturedDestinationSuggestion(paris, eiffelTower, 5000)
-        )
+            @Test
+            fun returns_no_recommendations() {
+                val recommendations = Recommendations(destinationFinder::getValue, featuredDistances::getValue)
+                val suggestions = recommendations.recommendationsFor(journey)
 
-        assertEquals(shouldReturn, resultFor)
-//
-//        check(
-//            featuredDestinations = mapOf(
-//                paris to listOf(eiffelTower, louvre),
-//            ),
-//            distances = distances,
-//            recommendations = setOf(paris),
-//            shouldReturn = listOf(
-//                FeaturedDestinationSuggestion(paris, louvre, 1000),
-//                FeaturedDestinationSuggestion(paris, eiffelTower, 5000)
-//            )
-//        )
+                assertEquals(suggestions, emptyList<FeaturedDestinationSuggestion>())
+            }
+        }
+
+        @Nested
+        inner class When_single_location {
+            @BeforeEach
+            fun setUp() {
+                featuredDestinations = listOf(
+                    paris to listOf(eiffelTower, louvre),
+                )
+                journeys = listOf(paris, alton)
+            }
+
+            @Test
+            fun returns_recommendations() {
+
+                val recommendations = Recommendations(destinationFinder::getValue, featuredDistances::getValue)
+                val suggestions = recommendations.recommendationsFor(journey)
+
+                assertEquals(
+                    suggestions, listOf(
+                        FeaturedDestinationSuggestion(paris, louvre, 1000),
+                        FeaturedDestinationSuggestion(paris, eiffelTower, 5000)
+                    )
+                )
+            }
+        }
+
+
+        @Test
+        fun returns_recommendations_for_multi_location() {
+            featuredDestinations = listOf(
+                paris to listOf(eiffelTower, louvre),
+                alton to listOf(flowerFarm, watercressLine),
+            )
+            journeys = listOf(paris, alton)
+
+            val recommendations = Recommendations(
+                destinationFinder::getValue,
+                featuredDistances::getValue
+            )
+            val suggestions = recommendations.recommendationsFor(journey)
+
+            assertEquals(
+                suggestions, listOf(
+                    FeaturedDestinationSuggestion(alton, watercressLine, 320),
+                    FeaturedDestinationSuggestion(paris, louvre, 1000),
+                    FeaturedDestinationSuggestion(paris, eiffelTower, 5000),
+                    FeaturedDestinationSuggestion(alton, flowerFarm, 5300)
+                )
+            )
+        }
+
+        @Test
+        fun deduplicates_using_smallest_distance() {
+            featuredDestinations = listOf(
+                alton to listOf(flowerFarm, watercressLine),
+                froyle to listOf(flowerFarm, watercressLine)
+            )
+            journeys = listOf(alton, froyle)
+
+            val recommendations = Recommendations(
+                destinationFinder::getValue,
+                featuredDistances::getValue
+            )
+            val suggestions = recommendations.recommendationsFor(journey)
+
+            assertEquals(
+                suggestions, listOf(
+                    FeaturedDestinationSuggestion(froyle, flowerFarm, 0),
+                    FeaturedDestinationSuggestion(alton, watercressLine, 320)
+                )
+            )
+        }
     }
-
-
-    @Test
-    fun returns_recommendations_for_multi_location() {
-        val featuredDestinations = mapOf<Location, List<FeaturedDestination>>(
-            paris to listOf(eiffelTower, louvre),
-            alton to listOf(flowerFarm, watercressLine),
-        ).withDefault { emptyList() }
-        val mockDistances =  distances.withDefault { -1 }
-
-        val recommendations = Recommendations(featuredDestinations::getValue, mockDistances::getValue)
-        val resultFor = recommendations.recommendationsFor(setOf(paris, alton))
-
-        val shouldReturn = listOf(
-                            FeaturedDestinationSuggestion(alton, watercressLine, 320),
-                FeaturedDestinationSuggestion(paris, louvre, 1000),
-                FeaturedDestinationSuggestion(paris, eiffelTower, 5000),
-                FeaturedDestinationSuggestion(alton, flowerFarm, 5300)
-        )
-
-        assertEquals(shouldReturn, resultFor)
-
-//        check(
-//            featuredDestinations = mapOf(
-//                paris to listOf(eiffelTower, louvre),
-//                alton to listOf(flowerFarm, watercressLine),
-//            ),
-//            distances = distances,
-//            recommendations = setOf(paris, alton),
-//            shouldReturn = listOf(
-//                FeaturedDestinationSuggestion(alton, watercressLine, 320),
-//                FeaturedDestinationSuggestion(paris, louvre, 1000),
-//                FeaturedDestinationSuggestion(paris, eiffelTower, 5000),
-//                FeaturedDestinationSuggestion(alton, flowerFarm, 5300)
-//            )
-//        )
-    }
-//
-//    @Test
-//    fun deduplicates_using_smallest_distance() {
-//        check(
-//            featuredDestinations = mapOf(
-//                alton to listOf(flowerFarm, watercressLine),
-//                froyle to listOf(flowerFarm, watercressLine)
-//            ),
-//            distances = distances,
-//            recommendations = setOf(alton, froyle),
-//            shouldReturn = listOf(
-//                FeaturedDestinationSuggestion(froyle, flowerFarm, 0),
-//                FeaturedDestinationSuggestion(alton, watercressLine, 320)
-//            )
-//        )
-//    }
-}
-
-private fun subjectFor(
-    featuredDestinations: Map<Location, List<FeaturedDestination>>,
-    distances: Map<Pair<Location, Location>, Int>
-): Recommendations {
-    val destinationsLookup = featuredDestinations.withDefault { emptyList() }
-    val distanceLookup = distances.withDefault { -1 }
-    return Recommendations(destinationsLookup::getValue, distanceLookup::getValue)
-}
-
-private fun check(
-    featuredDestinations: Map<Location, List<FeaturedDestination>>,
-    distances: Map<Pair<Location, Location>, Int>,
-    recommendations: Set<Location>,
-    shouldReturn: List<FeaturedDestinationSuggestion>
-) {
-    assertEquals(
-        shouldReturn,
-        resultFor(featuredDestinations, distances, recommendations)
-    )
-}
-
-private fun resultFor(
-    featuredDestinations: Map<Location, List<FeaturedDestination>>,
-    distances: Map<Pair<Location, Location>, Int>,
-    locations: Set<Location>
-): List<FeaturedDestinationSuggestion> {
-    val subject = subjectFor(featuredDestinations, distances)
-    return subject.recommendationsFor(locations)
 }
 
 private fun <K1, K2, V> Map<Pair<K1, K2>, V>.getValue(k1: K1, k2: K2) =
